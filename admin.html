@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TimeLock Admin</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:linear-gradient(160deg,#0e1230,#1b1650) fixed;color:#f4f6ff;min-height:100vh}
+.wrap{max-width:1000px;margin:auto;padding:20px}.box{max-width:380px;margin:12vh auto;padding:26px}
+h1{margin:0 0 14px;font-size:24px}h3{margin:0 0 10px}.card{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:18px;margin-bottom:16px}
+input,select,textarea{width:100%;padding:12px 14px;margin:0 0 10px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;font:inherit}
+select option{color:#222}button{font:inherit;cursor:pointer;border:0;border-radius:14px;padding:11px 18px;font-weight:700;color:#1b1030;background:linear-gradient(135deg,#ff9f43,#ff5e7e)}
+.gh{background:rgba(255,255,255,.1);color:#fff}.dn{background:#ff5e7e}.pri{width:100%}.err{color:#ff8fa3;min-height:18px}
+nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}nav button{background:rgba(255,255,255,.08);color:#cfd5ff}nav button.on{background:linear-gradient(135deg,#ff9f43,#ff5e7e);color:#1b1030}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}.stat b{display:block;font-size:30px}.stat span{color:#9ba3cf;font-size:13px}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1);white-space:nowrap}th{color:#9ba3cf;font-size:12px;text-transform:uppercase}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.s{color:#9ba3cf;font-size:13px}
+</style></head><body><div class="wrap" id="app"></div>
+<script>
+var FBC={apiKey:"AIza...",authDomain:"timelock-school-a1b2c.firebaseapp.com",projectId:"timelock-school-a1b2c",appId:"1:1234567890:web:abcdef"};
+firebase.initializeApp(FBC);
+var au=firebase.auth(),db=firebase.firestore(),app=document.getElementById("app"),S=[],QL=[],tab="ov",msg="",q="";
+function $(i){return document.getElementById(i)}
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function loginView(){var m=msg;msg="";app.innerHTML='<div class="box card"><h1>TimeLock Admin</h1><input id="em" type="email" placeholder="Admin email"><input id="pw" type="password" placeholder="Password"><div class="err">'+esc(m)+'</div><button class="pri" onclick="li()">Log in</button></div>'}
+function li(){au.signInWithEmailAndPassword($("em").value.trim(),$("pw").value).catch(function(){msg="Wrong email or password.";loginView()})}
+au.onAuthStateChanged(function(u){if(!u)return loginView();
+ db.collection("admins").doc(u.uid).get().then(function(s){if(!s.exists){msg="This account is not an admin.";return au.signOut()}load()}).catch(function(){msg="Not allowed.";au.signOut()})});
+function load(){Promise.all([db.collection("users").get(),db.collection("questions").get()]).then(function(r){
+ S=r[0].docs.map(function(d){var x=d.data();x.id=d.id;return x});QL=r[1].docs.map(function(d){var x=d.data();x.id=d.id;return x});draw()}).catch(function(e){app.innerHTML='<div class="card">Could not load data: '+esc(e.message)+'</div>'})}
+function go(t){tab=t;draw()}
+function draw(){
+ var T=[["ov","Overview"],["st","Students"],["qs","Questions"],["an","Announcement"]],h='<div class="top"><h1>TimeLock Admin</h1><button class="gh" onclick="au.signOut()">Log out</button></div><nav>'+T.map(function(t){return'<button class="'+(tab===t[0]?"on":"")+'" onclick="go(\''+t[0]+'\')">'+t[1]+'</button>'}).join('')+'</nav>';
+ var today=new Date().toDateString();
+ if(tab==="ov"){var act=S.filter(function(u){return(u.pts||{})[today]>0}).length,tot=S.reduce(function(a,u){return a+(u.score||0)},0),top=S.slice().sort(function(a,b){return b.score-a.score}).slice(0,5);
+  h+='<div class="stats"><div class="card stat"><b>'+S.length+'</b><span>Students</span></div><div class="card stat"><b>'+act+'</b><span>Active today</span></div><div class="card stat"><b>'+tot+'</b><span>Total points</span></div><div class="card stat"><b>'+QL.length+'</b><span>Custom questions</span></div></div><div class="card"><h3>Top 5</h3>'+(top.map(function(u,i){return'<div style="padding:6px 0">'+(i+1)+'. <b>'+esc(u.name)+'</b> <span class="s">'+esc(u.school)+'</span> — '+u.score+'</div>'}).join('')||'<span class="s">No students yet.</span>')+'</div>'}
+ if(tab==="st"){var L=S.filter(function(u){return(u.name+u.email+u.school+u.sid).toLowerCase().indexOf(q.toLowerCase())>-1}).sort(function(a,b){return(b.score||0)-(a.score||0)});
+  h+='<div class="card"><div class="top"><input id="sq" placeholder="Search name, email, school, ID" value="'+esc(q)+'" oninput="q=this.value;draw();$(\'sq\').focus()" style="margin:0;max-width:340px"><button onclick="csv()">Export CSV</button></div><div class="tw"><table><tr><th>Name</th><th>School</th><th>Grade</th><th>ID</th><th>Email</th><th>Phone</th><th>Guardian</th><th>Score</th><th></th></tr>'+L.map(function(u){return'<tr><td>'+esc(u.name)+'</td><td>'+esc(u.school)+'</td><td>'+esc(u.grade)+'</td><td>'+esc(u.sid)+'</td><td>'+esc(u.email)+'</td><td>'+esc(u.phone)+'</td><td>'+esc(u.gname)+' '+esc(u.gphone)+'</td><td><b>'+(u.score||0)+'</b></td><td><button class="dn" onclick="del(\''+u.id+'\')">Delete</button></td></tr>'}).join('')+'</table></div><p class="s">Delete removes the profile and leaderboard entry. To remove the login too, delete the user in Firebase Authentication.</p></div>'}
+ if(tab==="qs")h+='<div class="card"><h3>Add a question</h3><input id="nq" placeholder="Question"><input id="o0" placeholder="Option A"><input id="o1" placeholder="Option B"><input id="o2" placeholder="Option C"><input id="o3" placeholder="Option D"><select id="oa"><option value="0">Correct: A</option><option value="1">Correct: B</option><option value="2">Correct: C</option><option value="3">Correct: D</option></select><div class="err">'+esc(msg)+'</div><button onclick="addQ()">Add question</button></div><div class="card"><h3>Your questions ('+QL.length+')</h3><p class="s">With at least 3 here, students use these instead of the built-in ones. Daily questions rotate through them.</p>'+QL.map(function(x){return'<div style="padding:8px 0;border-top:1px solid rgba(255,255,255,.1)"><b>'+esc(x.q)+'</b><div class="s">'+x.o.map(function(o,i){return(i==x.a?"✓ ":"")+esc(o)}).join(' · ')+'</div><button class="dn" style="margin-top:6px;padding:6px 12px" onclick="delQ(\''+x.id+'\')">Delete</button></div>'}).join('')+'</div>';
+ if(tab==="an")h+='<div class="card"><h3>Announcement shown on every student\'s home screen</h3><textarea id="at" rows="3" maxlength="200"></textarea><button onclick="ann(1)">Post</button> <button class="gh" onclick="ann(0)">Clear</button><p class="s" id="am"></p></div>';
+ app.innerHTML=h;msg="";
+}
+function del(id){if(confirm("Delete this student's profile and leaderboard entry?"))Promise.all([db.collection("users").doc(id).delete(),db.collection("board").doc(id).delete()]).then(load)}
+function addQ(){var t=$("nq").value.trim(),o=[0,1,2,3].map(function(i){return $("o"+i).value.trim()});if(!t||o.some(function(x){return!x})){msg="Fill the question and all 4 options.";return draw()}db.collection("questions").add({q:t,o:o,a:+$("oa").value}).then(load)}
+function delQ(id){if(confirm("Delete this question?"))db.collection("questions").doc(id).delete().then(load)}
+function ann(p){db.collection("meta").doc("ann").set({text:p?$("at").value.trim():""}).then(function(){$("am").textContent=p?"Posted.":"Cleared."})}
+function csv(){var r=[["Name","School","Grade","Student ID","Email","Phone","Guardian","Guardian phone","Score"]].concat(S.map(function(u){return[u.name,u.school,u.grade,u.sid,u.email,u.phone,u.gname,u.gphone,u.score||0]}));
+ var t=r.map(function(x){return x.map(function(c){return'"'+String(c==null?"":c).replace(/"/g,'""')+'"'}).join(",")}).join("\n"),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"text/csv"}));a.download="students.csv";a.click()}
+</script></body></html>
